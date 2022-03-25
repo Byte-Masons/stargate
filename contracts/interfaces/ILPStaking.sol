@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity 0.7.6;
+pragma solidity ^0.8.0;
 pragma abicoder v2;
 
 interface ILPStaking {
@@ -11,11 +11,11 @@ interface ILPStaking {
 
     function userInfo(uint256 _poolId, address _userAddress) external view returns (uint256 amount, uint256 rewardDebt);
 
-    function deposit(uint256 _pid, uint256 _amount) public;
+    function deposit(uint256 _pid, uint256 _amount) external;
 
-    function withdraw(uint256 _pid, uint256 _amount) public;
+    function withdraw(uint256 _pid, uint256 _amount) external;
 
-    function emergencyWithdraw(uint256 _pid) public;
+    function emergencyWithdraw(uint256 _pid) external;
 
     function pendingStargate(uint256 _pid, address _user) external view returns (uint256);
 }
