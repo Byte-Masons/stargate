@@ -91,34 +91,31 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
     /**
      * @dev Core function of the strat, in charge of collecting and re-investing rewards.
      *      1. Claims {STG} from the {STARGATE_LP_STAKING}.
-     *      2. Swaps {STG} to {WFTM} using {SPOOKY_ROUTER}.
-     *      3. Claims fees for the harvest caller and treasury.
-     *      4. Swaps the {WFTM} token for {sWant} using {SPOOKY_ROUTER}.
-     *      5. Swaps half of {sWant} to {lpToken1} using {STARGATE_ROUTER}.
-     *      6. Creates new LP tokens and deposits.
+     *      2. Claims fees for the harvest caller and treasury.
+     *      3. Swaps {STG} to {USDC} using {SPOOKY_ROUTER}.
+     *      4. Creates want token and deposits.
      */
     function _harvestCore() internal override {
         ILPStaking(STARGATE_LP_STAKING).deposit(poolId, 0); // deposit 0 to claim rewards
         _chargeFees();
         uint256 stgBal = IERC20Upgradeable(STG).balanceOf(address(this));
-        _swap(stgBal, rewardToUSDCPath, SPOOKY_ROUTER);
+        _swap(stgBal, rewardToUSDCPath);
         _addLiquidity();
         deposit();
     }
 
     /**
-     * @dev Helper function to swap tokens given an {_amount}, swap {_path}, and {_router}.
+     * @dev Helper function to swap tokens given an {_amount}, swap {_path}
      */
     function _swap(
         uint256 _amount,
-        address[] memory _path,
-        address _router
+        address[] memory _path
     ) internal {
         if (_path.length < 2 || _amount == 0) {
             return;
         }
 
-        IUniswapV2Router02(_router).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        IUniswapV2Router02(SPOOKY_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
             _amount,
             0,
             _path,
@@ -134,7 +131,7 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
     function _chargeFees() internal {
         IERC20Upgradeable wftm = IERC20Upgradeable(WFTM);
         uint256 stgFee = (IERC20Upgradeable(STG).balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR;
-        _swap(stgFee, rewardToWftmPath, SPOOKY_ROUTER);
+        _swap(stgFee, rewardToWftmPath);
         uint256 wftmBal = wftm.balanceOf(address(this));
         if (wftmBal != 0) {
             uint256 callFeeToUser = (wftmBal * callFee) / PERCENT_DIVISOR;
@@ -149,7 +146,7 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
     }
 
     /**
-     * @dev Core harvest function. Adds more liquidity using {sWant} and {lpToken1}.
+     * @dev Core harvest function. Adds more liquidity using {USDC}
      */
     function _addLiquidity() internal {
         uint256 usdcBal = IERC20Upgradeable(USDC).balanceOf(address(this));
@@ -161,7 +158,7 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
 
     /**
      * @dev Function to calculate the total {want} held by the strat.
-     *      It takes into account both the funds in hand, plus the funds in the MasterChef.
+     *      It takes into account both the funds in hand, plus the funds in the LPStaking contract.
      */
     function balanceOf() public view override returns (uint256) {
         (uint256 amount, ) = ILPStaking(STARGATE_LP_STAKING).userInfo(poolId, address(this));
@@ -215,9 +212,7 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
      * @dev Gives all the necessary allowances to:
      *      - deposit {want} into {STARGATE_LP_STAKING}
      *      - swap {STG} using {SPOOKY_ROUTER}
-     *      - swap {WFTM} using {SPOOKY_ROUTER}
-     *      - swap {sWant} using {STARGATE_ROUTER}
-     *      - add liquidity using {sWant} and {lpToken1} in {STARGATE_ROUTER}
+     *      - add liquidity using {USDC} in {STARGATE_ROUTER}
      */
     function _giveAllowances() internal override {
         IERC20Upgradeable(want).safeApprove(STARGATE_LP_STAKING, 0);
