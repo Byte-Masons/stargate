@@ -8,8 +8,10 @@ import "./interfaces/IStargateRouter.sol";
 import "./interfaces/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
+import "hardhat/console.sol";
+
 /**
- * @dev Deposit USDC in router, get Stargate USDC, stake in LP staking. Harvest STG rewards and recompound.
+ * @dev Deposit USDC_LP in router, get Stargate USDC_LP, stake in LP staking. Harvest STG rewards and recompound.
  */
 contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -23,29 +25,31 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
      * @dev Tokens Used:
      * {WFTM} - Required for liquidity routing when doing swaps
      * {STG} - Reward token for depositing
-     * {USDC} - Used for liquidity routing to get to want
+     * {USDC_LP} - The Stargate deposited want
      * {want} - want token the strategy is compounding
      */
     address public constant WFTM = address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
     address public constant STG = address(0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590);
-    address public constant USDC = address(0x04068DA6C83AFCFA0e13ba15A6696662335D5B75);
-    address public constant want = address(0x12edeA9cd262006cC3C4E77c90d2CD2DD4b1eb97);
+    address public constant USDC_LP = address(0x12edeA9cd262006cC3C4E77c90d2CD2DD4b1eb97);
+    address public constant want = address(0x04068DA6C83AFCFA0e13ba15A6696662335D5B75);
 
     /**
      * @dev Paths used to swap tokens:
      * {rewardToWftmPath} - to swap {STG} to {WFTM} (using SPOOKY_ROUTER)
-     * {rewardtoUSDCPath} - to swap {STG} to {USDC} (using SPOOKY_ROUTER)
+     * {rewardToWantPath} - to swap {STG} to {want} (using SPOOKY_ROUTER)
      */
     address[] public rewardToWftmPath;
-    address[] public rewardToUSDCPath;
+    address[] public rewardToWantPath;
 
     /**
      * @dev Stargate variables
      * {poolId} - ID of pool in which to deposit LP tokens in LPStaking contract
-     * {routerPoolId} - ID of pool in which to deposit USDC in Router contract
+     * {routerPoolId} - ID of pool in which to deposit USDC_LP in Router contract
+     * {withdrawSlippageTolerance} - Maximum slippage authorized when withdrawing
      */
     uint256 public poolId;
     uint256 public routerPoolId;
+    uint256 public withdrawSlippageTolerance;
 
     /**
      * @dev Initializes the strategy. Sets parameters and saves routes.
@@ -57,10 +61,11 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
         address[] memory _strategists
     ) public initializer {
         __ReaperBaseStrategy_init(_vault, _feeRemitters, _strategists);
-        rewardToWftmPath = [STG, USDC, WFTM];
-        rewardToUSDCPath = [STG, USDC];
+        rewardToWftmPath = [STG, USDC_LP, WFTM];
+        rewardToWantPath = [STG, USDC_LP];
         poolId = 0;
         routerPoolId = 1;
+        withdrawSlippageTolerance = 20;
         _giveAllowances();
     }
 
@@ -69,9 +74,11 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
      *      It gets called whenever someone deposits in the strategy's vault contract.
      */
     function _deposit() internal override {
-        uint256 wantBalance = IERC20Upgradeable(want).balanceOf(address(this));
-        if (wantBalance != 0) {
-            ILPStaking(STARGATE_LP_STAKING).deposit(poolId, wantBalance);
+        _addLiquidity();
+        uint256 lpBalance = IERC20Upgradeable(USDC_LP).balanceOf(address(this));
+        if (lpBalance != 0) {
+            
+            ILPStaking(STARGATE_LP_STAKING).deposit(poolId, lpBalance);
         }
     }
 
@@ -79,9 +86,33 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
      * @dev Withdraws funds and sends them back to the vault.
      */
     function _withdraw(uint256 _amount) internal override {
+        
+        console.log("_withdraw: ", _amount);
         uint256 wantBal = IERC20Upgradeable(want).balanceOf(address(this));
+        console.log("wantBal: ", wantBal);
         if (wantBal < _amount) {
             ILPStaking(STARGATE_LP_STAKING).withdraw(poolId, _amount - wantBal);
+            uint256 lpBalance = IERC20Upgradeable(USDC_LP).balanceOf(address(this));
+            console.log("lpBalance: ", lpBalance);
+            IStargateRouter(STARGATE_ROUTER).instantRedeemLocal(uint16(routerPoolId), lpBalance, address(this));
+            
+            console.log("wantBal: ", wantBal);
+        }
+
+        uint256 initialWithdrawAmount = _amount;
+        wantBal = IERC20Upgradeable(want).balanceOf(address(this));
+
+        if (wantBal < _amount) {
+            _amount = wantBal;
+        }
+
+        if(_amount < initialWithdrawAmount) {
+            require(
+                _amount >=
+                    (initialWithdrawAmount *
+                        (PERCENT_DIVISOR - withdrawSlippageTolerance)) /
+                        PERCENT_DIVISOR
+            );
         }
 
         IERC20Upgradeable(want).safeTransfer(vault, _amount);
@@ -91,15 +122,14 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
      * @dev Core function of the strat, in charge of collecting and re-investing rewards.
      *      1. Claims {STG} from the {STARGATE_LP_STAKING}.
      *      2. Claims fees for the harvest caller and treasury.
-     *      3. Swaps {STG} to {USDC} using {SPOOKY_ROUTER}.
+     *      3. Swaps {STG} to {USDC_LP} using {SPOOKY_ROUTER}.
      *      4. Creates want token and deposits.
      */
     function _harvestCore() internal override {
         ILPStaking(STARGATE_LP_STAKING).deposit(poolId, 0); // deposit 0 to claim rewards
         _chargeFees();
         uint256 stgBal = IERC20Upgradeable(STG).balanceOf(address(this));
-        _swap(stgBal, rewardToUSDCPath);
-        _addLiquidity();
+        _swap(stgBal, rewardToWantPath);
         deposit();
     }
 
@@ -145,13 +175,13 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
     }
 
     /**
-     * @dev Core harvest function. Adds more liquidity using {USDC}
+     * @dev Core harvest function. Adds more liquidity using {want}
      */
     function _addLiquidity() internal {
-        uint256 usdcBal = IERC20Upgradeable(USDC).balanceOf(address(this));
+        uint256 wantBal = IERC20Upgradeable(want).balanceOf(address(this));
 
-        if (usdcBal != 0) {
-            IStargateRouter(STARGATE_ROUTER).addLiquidity(routerPoolId, usdcBal, address(this));
+        if (wantBal != 0) {
+            IStargateRouter(STARGATE_ROUTER).addLiquidity(routerPoolId, wantBal, address(this));
         }
     }
 
@@ -211,23 +241,31 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
      * @dev Gives all the necessary allowances to:
      *      - deposit {want} into {STARGATE_LP_STAKING}
      *      - swap {STG} using {SPOOKY_ROUTER}
-     *      - add liquidity using {USDC} in {STARGATE_ROUTER}
+     *      - add liquidity using {USDC_LP} in {STARGATE_ROUTER}
      */
     function _giveAllowances() internal override {
-        IERC20Upgradeable(want).safeApprove(STARGATE_LP_STAKING, 0);
-        IERC20Upgradeable(want).safeApprove(STARGATE_LP_STAKING, type(uint256).max);
+        IERC20Upgradeable(want).safeApprove(STARGATE_ROUTER, 0);
+        IERC20Upgradeable(want).safeApprove(STARGATE_ROUTER, type(uint256).max);
         IERC20Upgradeable(STG).safeApprove(SPOOKY_ROUTER, 0);
         IERC20Upgradeable(STG).safeApprove(SPOOKY_ROUTER, type(uint256).max);
-        IERC20Upgradeable(USDC).safeApprove(STARGATE_ROUTER, 0);
-        IERC20Upgradeable(USDC).safeApprove(STARGATE_ROUTER, type(uint256).max);
+        IERC20Upgradeable(USDC_LP).safeApprove(STARGATE_LP_STAKING, 0);
+        IERC20Upgradeable(USDC_LP).safeApprove(STARGATE_LP_STAKING, type(uint256).max);
     }
 
     /**
      * @dev Removes all the allowances that were given above.
      */
     function _removeAllowances() internal override {
-        IERC20Upgradeable(want).safeApprove(STARGATE_LP_STAKING, 0);
+        IERC20Upgradeable(want).safeApprove(STARGATE_ROUTER, 0);
         IERC20Upgradeable(STG).safeApprove(SPOOKY_ROUTER, 0);
-        IERC20Upgradeable(USDC).safeApprove(STARGATE_ROUTER, 0);
+        IERC20Upgradeable(USDC_LP).safeApprove(STARGATE_LP_STAKING, 0);
+    }
+
+    /**
+     * @dev Sets the maximum slippage authorized when withdrawing
+     */
+    function setWithdrawSlippageTolerance(uint256 _withdrawSlippageTolerance) external {
+        _onlyStrategistOrOwner();
+        withdrawSlippageTolerance = _withdrawSlippageTolerance;
     }
 }

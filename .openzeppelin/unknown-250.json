@@ -2,15 +2,15 @@
   "manifestVersion": "3.2",
   "proxies": [
     {
-      "address": "0x5081a39b8A5f0E35a8D959395a630b68B74Dd30f",
-      "txHash": "0x656a735a99a5b183a33a9c5589ca2dc2b43b0e776ad296a97f1e3ff407a1b674",
+      "address": "0x5fbbC9C8EC6852A6d52b087f41833f6127674E6B",
+      "txHash": "0x4432c3a6978e6afb8b255775e8eb6140a456904c5724a7220c2863bf4523809e",
       "kind": "uups"
     }
   ],
   "impls": {
-    "53fd24389d24f8596da690c268cd7044f2c43c943127fe770f337e8331e858c1": {
-      "address": "0x922D6956C99E12DFeB3224DEA977D0939758A1Fe",
-      "txHash": "0x66fbc9371d424ad55bf93048348874f6e17fce28c6863a402e0f8ca305e543d3",
+    "437a6387e0f808c28ba12ecc76f44c6e1ccbbb2c1b0b7169e12fb5fddfed61e3": {
+      "address": "0x6908d5C646f88F99C7d7197e7560e36eeA858CF9",
+      "txHash": "0x0d7231b982cf631d05f3a5dc63c319c76caace7beea7349d0be3b28cbb032cc8",
       "layout": {
         "storage": [
           {
@@ -113,7 +113,7 @@
             "label": "harvestLog",
             "offset": 0,
             "slot": "351",
-            "type": "t_array(t_struct(Harvest)5975_storage)dyn_storage",
+            "type": "t_array(t_struct(Harvest)5855_storage)dyn_storage",
             "contract": "ReaperBaseStrategyv1_1",
             "src": "contracts\\abstract\\ReaperBaseStrategyv1_1.sol:27"
           },
@@ -211,15 +211,15 @@
             "slot": "363",
             "type": "t_array(t_address)dyn_storage",
             "contract": "ReaperStrategyStargate",
-            "src": "contracts\\ReaperStrategyStargate.sol:41"
+            "src": "contracts\\ReaperStrategyStargate.sol:39"
           },
           {
-            "label": "rewardToWantPath",
+            "label": "rewardToUSDCPath",
             "offset": 0,
             "slot": "364",
             "type": "t_array(t_address)dyn_storage",
             "contract": "ReaperStrategyStargate",
-            "src": "contracts\\ReaperStrategyStargate.sol:42"
+            "src": "contracts\\ReaperStrategyStargate.sol:40"
           },
           {
             "label": "poolId",
@@ -227,7 +227,7 @@
             "slot": "365",
             "type": "t_uint256",
             "contract": "ReaperStrategyStargate",
-            "src": "contracts\\ReaperStrategyStargate.sol:50"
+            "src": "contracts\\ReaperStrategyStargate.sol:47"
           },
           {
             "label": "routerPoolId",
@@ -235,15 +235,7 @@
             "slot": "366",
             "type": "t_uint256",
             "contract": "ReaperStrategyStargate",
-            "src": "contracts\\ReaperStrategyStargate.sol:51"
-          },
-          {
-            "label": "withdrawSlippageTolerance",
-            "offset": 0,
-            "slot": "367",
-            "type": "t_uint256",
-            "contract": "ReaperStrategyStargate",
-            "src": "contracts\\ReaperStrategyStargate.sol:52"
+            "src": "contracts\\ReaperStrategyStargate.sol:48"
           }
         ],
         "types": {
@@ -259,7 +251,7 @@
             "label": "bytes32[]",
             "numberOfBytes": "32"
           },
-          "t_array(t_struct(Harvest)5975_storage)dyn_storage": {
+          "t_array(t_struct(Harvest)5855_storage)dyn_storage": {
             "label": "struct ReaperBaseStrategyv1_1.Harvest[]",
             "numberOfBytes": "32"
           },
@@ -307,7 +299,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(Harvest)5975_storage": {
+          "t_struct(Harvest)5855_storage": {
             "label": "struct ReaperBaseStrategyv1_1.Harvest",
             "members": [
               {
