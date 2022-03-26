@@ -7,7 +7,6 @@ import "./interfaces/ILPStaking.sol";
 import "./interfaces/IStargateRouter.sol";
 import "./interfaces/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
 
 /**
  * @dev Deposit USDC in router, get Stargate USDC, stake in LP staking. Harvest STG rewards and recompound.
@@ -43,7 +42,7 @@ contract ReaperStrategyStargate is ReaperBaseStrategyv1_1 {
     /**
      * @dev Stargate variables
      * {poolId} - ID of pool in which to deposit LP tokens in LPStaking contract
-     * {poolId} - ID of pool in which to deposit USDC in Router contract
+     * {routerPoolId} - ID of pool in which to deposit USDC in Router contract
      */
     uint256 public poolId;
     uint256 public routerPoolId;
